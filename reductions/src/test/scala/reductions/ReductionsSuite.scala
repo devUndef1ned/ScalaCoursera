@@ -118,7 +118,26 @@ class ReductionsSuite {
     check(").", false)
   }
 
+  @Test def `parBalance should work`: Unit = {
+    def check(input: String, expected: Boolean) =
+      assert(parBalance(input.toArray, 2) == expected,
+        s"balance('$input') should be $expected")
 
-  @Rule def individualTestTimeout = new org.junit.rules.Timeout(10 * 1000)
+    check("()()", true)
+    check("())(", false)
+    check(")))(((", false)
+    check("((()))", true)
+    check("()", true)
+    check(")(", false)
+    check("((", false)
+    check("))", false)
+    check(".)", false)
+    check(".(", false)
+    check("(.", false)
+    check(").", false)
+  }
+
+
+  @Rule def individualTestTimeout = new org.junit.rules.Timeout(1000 * 1000)
 }
 
