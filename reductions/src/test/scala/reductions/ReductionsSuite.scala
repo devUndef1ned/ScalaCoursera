@@ -24,6 +24,28 @@ class ReductionsSuite {
     assertEquals(List(0f, 1f, 4f, 4f), output.toList)
   }
 
+  @Test def `result of sequenced line of sight algorithm must be the same as parallel with big threshold`: Unit = {
+    val input = List(0.0f, 7.0f, 6.0f, 33.0f, 48.0f).toArray
+    val expected = new Array[Float](input.length)
+    lineOfSight(input, expected)
+    val output = new Array[Float](input.length)
+
+    parLineOfSight(input, output, input.length)
+
+    assertEquals(expected.toList, output.toList)
+  }
+
+  @Test def `result of sequenced line of sight algorithm must be the same as parallel with small threshold`: Unit = {
+    val input = List(0.0f, 7.0f, 6.0f, 33.0f, 48.0f).toArray
+    val expected = new Array[Float](input.length)
+    lineOfSight(input, expected)
+    val output = new Array[Float](input.length)
+
+    parLineOfSight(input, output, 2)
+
+    assertEquals(expected.toList, output.toList)
+  }
+
 
   /*******************************
    * PARALLEL COUNT CHANGE SUITE *

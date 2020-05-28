@@ -33,7 +33,7 @@ sealed abstract class Tree {
 }
 
 case class Node(left: Tree, right: Tree) extends Tree {
-  val maxPrevious = left.maxPrevious.max(right.maxPrevious)
+  override val maxPrevious = left.maxPrevious.max(right.maxPrevious)
 }
 
 case class Leaf(from: Int, until: Int, maxPrevious: Float) extends Tree
@@ -56,8 +56,8 @@ object LineOfSight extends LineOfSightInterface {
   /** Traverses the specified part of the array and returns the maximum angle.
    */
   def upsweepSequential(input: Array[Float], from: Int, until: Int): Float = {
-    var max = input(from)/from
-    var index = from + 1
+    var max = Float.NegativeInfinity
+    var index = from
     while (index < until) {
       val value = input(index)/index
       if (max < value) {
@@ -111,15 +111,15 @@ object LineOfSight extends LineOfSightInterface {
    */
   def downsweep(input: Array[Float], output: Array[Float], startingAngle: Float,
                 tree: Tree): Unit = tree match {
-    case Leaf(from, until, maxPrevious) => downsweepSequential(input, output, maxPrevious, from, until)
+    case Leaf(from, until, _) => downsweepSequential(input, output, startingAngle, from, until)
     case Node(left, right) => parallel(downsweep(input, output, startingAngle, left),
-      downsweep(input, output, startingAngle, right))
+      downsweep(input, output, left.maxPrevious, right))
   }
 
   /** Compute the line-of-sight in parallel. */
   def parLineOfSight(input: Array[Float], output: Array[Float],
                      threshold: Int): Unit = {
     val tree = upsweep(input, 1, input.length, threshold)
-    downsweep(input, output, 0f, tree)
+    downsweep(input, output, 0, tree)
   }
 }
