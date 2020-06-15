@@ -43,16 +43,6 @@ package object barneshut {
     def total: Int
 
     def insert(b: Body): Quad
-
-    def isApplicableFor(body: Body): Boolean = {
-      val delta = size / 2
-      val topLeftX = centerX - delta
-      val topLeftY = centerY - delta
-      val bottomRightX = centerX + delta
-      val bottomRightY = centerY + delta
-      (body.x >= topLeftX && body.x <= bottomRightX) &&
-        (body.y >= topLeftY && body.y <= bottomRightY)
-    }
   }
 
   case class Empty(centerX: Float, centerY: Float, size: Float) extends Quad {
@@ -68,26 +58,24 @@ package object barneshut {
   }
 
   case class Fork(nw: Quad, ne: Quad, sw: Quad, se: Quad) extends Quad {
-    val centerX: Float = (nw.centerX + ne.centerX + sw.centerX + se.centerX) / 4
-    val centerY: Float = (nw.centerY + ne.centerY + sw.centerY + se.centerY) / 4
+    val centerX: Float = (nw.centerX + ne.centerX) / 2
+    val centerY: Float = (nw.centerY + sw.centerY) / 2
     val size: Float = nw.size + ne.size
     val mass: Float = nw.mass + ne.mass + sw.mass + se.mass
-    val massX: Float = (nw.massX * nw.mass + ne.massX * ne.mass + sw.massX * sw.mass + se.massX * se.mass) / mass
-    val massY: Float = (nw.massY * nw.mass + ne.massY * ne.mass + sw.massY * sw.mass + se.massY * se.mass) / mass
+    val massX: Float = if (mass == 0) centerX else
+      (nw.massX * nw.mass + ne.massX * ne.mass + sw.massX * sw.mass + se.massX * se.mass) / mass
+    val massY: Float = if (mass == 0) centerY else
+      (nw.massY * nw.mass + ne.massY * ne.mass + sw.massY * sw.mass + se.massY * se.mass) / mass
     val total: Int = nw.total + ne.total + sw.total + se.total
 
     def insert(b: Body): Fork = {
-      if (nw.isApplicableFor(b)) {
-        Fork(nw.insert(b), ne, sw, se)
-      } else if (ne.isApplicableFor(b)) {
-        Fork(nw, ne.insert(b), sw, se)
-      } else if (sw.isApplicableFor(b)) {
-        Fork(nw, ne, sw.insert(b), se)
-      } else if (se.isApplicableFor(b)) {
-        Fork(nw, ne, sw, se.insert(b))
-      } else {
-        this
-        //throw new IllegalArgumentException("Body must by applicable for one of the sub quadrants")
+      val inTopPart = b.y <= centerY
+      val inLeftPart = b.y <= centerX
+      (inLeftPart, inTopPart) match {
+        case (true, true) => Fork(nw.insert(b), ne, sw, se)
+        case (false, true) => Fork(nw, ne.insert(b), sw, se)
+        case (true, false) => Fork(nw, ne, sw.insert(b), se)
+        case (false, false) => Fork(nw, ne, sw, se.insert(b))
       }
     }
   }
@@ -103,17 +91,21 @@ package object barneshut {
       (mass, sumMassX / mass, sumMassY / mass)
     }
 
-    def insert(b: Body): Quad = if (size <= minimumSize) {
-      Leaf(centerX, centerY, size, b +: bodies)
-    } else {
-      val newSize = size / 2
-      val delta = newSize / 2
-      val newQuad = Fork(Empty(centerX - delta, centerY - delta, newSize),
-        Empty(centerX + delta, centerY - delta, newSize),
-        Empty(centerX - delta, centerY + delta, newSize),
-        Empty(centerX + delta, centerY + delta, newSize)
-      )
-      bodies.foldLeft(newQuad)((quad, body) => quad.insert(body))
+    def insert(b: Body): Quad = {
+      val newBodies = bodies :+ b
+      if (size <= minimumSize) {
+        Leaf(centerX, centerY, size, newBodies)
+      } else {
+        val newSize = size / 2
+        val delta = newSize / 2
+        val newQuad = Fork(
+          Empty(centerX - delta, centerY - delta, newSize),
+          Empty(centerX + delta, centerY - delta, newSize),
+          Empty(centerX - delta, centerY + delta, newSize),
+          Empty(centerX + delta, centerY + delta, newSize)
+        )
+        newBodies.foldLeft(newQuad)((quad, body) => quad.insert(body))
+      }
     }
   }
 
@@ -199,9 +191,7 @@ package object barneshut {
     for (i <- matrix.indices) matrix(i) = new ConcBuffer
 
     def +=(b: Body): SectorMatrix = {
-      val xIndex = getXIndex(b)
-      val yIndex = getYIndex(b)
-      matrix.update(yIndex * sectorPrecision + xIndex, apply(xIndex, yIndex) += b)
+      apply(getXIndex(b), getYIndex(b)) += b
       this
     }
 
@@ -209,15 +199,16 @@ package object barneshut {
 
     def combine(that: SectorMatrix): SectorMatrix = {
       def combine(res: SectorMatrix, matrix: Array[ConcBuffer[Body]]) = {
-        matrix.foldLeft(res) ((resAcc, buffer) => buffer.foldLeft(resAcc)((resAccInner, b) => resAccInner += b))
+        matrix.foldLeft(res)((resAcc, buffer) => buffer.foldLeft(resAcc)((resAccInner, b) => resAccInner += b))
       }
+
       val result = new SectorMatrix(boundaries, sectorPrecision)
       combine(combine(result, matrix), that.matrix)
     }
 
     def getXIndex(b: Body): Int = {
       if (fitX(b)) {
-        math.abs((b.x / sectorSize).toInt)
+        math.min(((b.x - boundaries.minX) / sectorSize).toInt, sectorPrecision - 1)
       } else if (b.x < boundaries.minX) {
         0
       } else {
@@ -227,7 +218,7 @@ package object barneshut {
 
     def getYIndex(b: Body): Int = {
       if (fitY(b)) {
-        math.abs((b.y / sectorSize).toInt)
+        math.min(((b.y - boundaries.minY) / sectorSize).toInt, sectorPrecision - 1)
       } else if (b.y < boundaries.minY) {
         0
       } else {

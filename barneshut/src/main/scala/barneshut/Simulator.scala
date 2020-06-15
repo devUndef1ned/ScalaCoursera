@@ -1,13 +1,9 @@
 package barneshut
 
-import java.awt._
-import java.awt.event._
-import javax.swing._
-import javax.swing.event._
-import scala.{collection => coll}
-import scala.collection.parallel.{TaskSupport, Combiner}
-import scala.collection.parallel.mutable.ParHashSet
 import scala.collection.parallel.CollectionConverters._
+import scala.collection.parallel.mutable.ParHashSet
+import scala.collection.parallel.{Combiner, TaskSupport}
+import scala.{collection => coll}
 
 class Simulator(val taskSupport: TaskSupport, val timeStats: TimeStatistics) {
 
@@ -47,7 +43,7 @@ class Simulator(val taskSupport: TaskSupport, val timeStats: TimeStatistics) {
   def updateBodies(bodies: coll.Seq[Body], quad: Quad): coll.Seq[Body] = timeStats.timed("update") {
     val parBodies = bodies.par
     parBodies.tasksupport = taskSupport
-    parBodies.map(b => b updated quad).toList
+    parBodies.map(b => b updated quad).seq
   }
 
   def eliminateOutliers(bodies: coll.Seq[Body], sectorMatrix: SectorMatrix, quad: Quad): coll.Seq[Body] = timeStats.timed("eliminate") {
@@ -108,5 +104,4 @@ class Simulator(val taskSupport: TaskSupport, val timeStats: TimeStatistics) {
 
     (newBodies, quad)
   }
-
 }
